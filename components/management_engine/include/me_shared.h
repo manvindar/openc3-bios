@@ -11,6 +11,8 @@
 
 // --- Status Flags (Shared LP-RAM) ---
 // Note: The ULP compiler automatically exports these variables with a "ulp_" prefix.
+// ESP32-C3 has no LP-Core, so these become ordinary HP-Core globals (defined in
+// management_engine.c) instead of ULP-linker-exported symbols.
 
 extern uint32_t ulp_me_hp_is_awake;
 extern uint32_t ulp_me_boot_reason;

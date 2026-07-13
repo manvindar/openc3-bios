@@ -45,8 +45,15 @@ static const char *TAG = "BOOT_MGR";
 
 // ─────────────────────────────────────────────────────────────────────────────
 #define USE_EXTERNAL_CP2102 1
-#define EXTERNAL_UART_TX_PIN 18  // <--- RE-ROUTED PHYSICAL TX PIN
-#define EXTERNAL_UART_RX_PIN 19  // <--- RE-ROUTED PHYSICAL RX PIN
+
+/* Payload UART pins (board-specific) */
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+  #define EXTERNAL_UART_TX_PIN 21  // C3 SuperMini: GPIO21 TX
+  #define EXTERNAL_UART_RX_PIN 20  // C3 SuperMini: GPIO20 RX
+#else
+  #define EXTERNAL_UART_TX_PIN 18  // C6: GPIO18 TX (default)
+  #define EXTERNAL_UART_RX_PIN 19  // C6: GPIO19 RX (default)
+#endif
 // ─────────────────────────────────────────────────────────────────────────────
 
 // 1. Create small wrappers for ABI type compatibility

@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "esp_sleep.h"
 #include "esp_system.h"
+#include "soc/soc_caps.h"
 #include "esp_partition.h"
 #include "driver/gpio.h"
 #include "rom/ets_sys.h"
@@ -30,7 +31,11 @@
 #include "openc6_fs.h"
 #include "hal_flash.h"
 
-#define BIOS_AP_SSID "BIOS_SETUP_C6"
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+  #define BIOS_AP_SSID "BIOS_SETUP_C3"
+#else
+  #define BIOS_AP_SSID "BIOS_SETUP_C6"
+#endif
 
 // GPIO pins for power button (Software GND and Sense)
 #define PIN_BTN_GND   3
@@ -191,11 +196,14 @@ void bios_enter_s5_state(void)
     led_mgmt_set_color(0, 0, 0);
     vTaskDelay(pdMS_TO_TICKS(100));
 
+#if SOC_ULP_SUPPORTED
     if (is_me_enabled) {
         ESP_LOGI(TAG, "S5: Power Off. Management Engine running in background.");
         ulp_me_hp_is_awake = 0;
         esp_sleep_enable_ulp_wakeup();
-    } else {
+    } else
+#endif
+    {
         ESP_LOGW(TAG, "S5: Legacy Mode. Using GPIO %d (Sense) and GPIO %d (GND) for wakeup.", PIN_BTN_SENSE, PIN_BTN_GND);
 
         gpio_reset_pin((gpio_num_t)PIN_BTN_GND);
@@ -207,7 +215,13 @@ void bios_enter_s5_state(void)
         gpio_set_direction((gpio_num_t)PIN_BTN_SENSE, GPIO_MODE_INPUT);
         gpio_set_pull_mode((gpio_num_t)PIN_BTN_SENSE, GPIO_PULLUP_ONLY);
 
+#if SOC_PM_SUPPORT_EXT1_WAKEUP
         esp_sleep_enable_ext1_wakeup(1ULL << PIN_BTN_SENSE, ESP_EXT1_WAKEUP_ANY_LOW);
+#else
+        /* ESP32-C3 has no RTC-IO/EXT1 wakeup domain: use regular GPIO wakeup instead. */
+        gpio_wakeup_enable((gpio_num_t)PIN_BTN_SENSE, GPIO_INTR_LOW_LEVEL);
+        esp_sleep_enable_gpio_wakeup();
+#endif
     }
 
     esp_deep_sleep_start();
@@ -219,7 +233,14 @@ void bios_core_start(void)
     bool is_cold_boot = (rst_reason != ESP_RST_DEEPSLEEP);
     uint32_t legacy_hold_ms = 0;
 
-    if (!is_cold_boot && (esp_sleep_get_wakeup_causes() & (1ULL << ESP_SLEEP_WAKEUP_EXT1))) {
+#if SOC_PM_SUPPORT_EXT1_WAKEUP
+    #define BIOS_WAKEUP_CAUSE ESP_SLEEP_WAKEUP_EXT1
+#else
+    /* ESP32-C3: Legacy Mode wakeup uses plain GPIO wakeup, not EXT1. */
+    #define BIOS_WAKEUP_CAUSE ESP_SLEEP_WAKEUP_GPIO
+#endif
+
+    if (!is_cold_boot && (esp_sleep_get_wakeup_causes() & (1ULL << BIOS_WAKEUP_CAUSE))) {
         gpio_reset_pin((gpio_num_t)PIN_BTN_GND);
         gpio_set_direction((gpio_num_t)PIN_BTN_GND, GPIO_MODE_OUTPUT);
         gpio_set_level((gpio_num_t)PIN_BTN_GND, 0);

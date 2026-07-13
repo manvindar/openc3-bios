@@ -1,7 +1,8 @@
-# OpenC6 BIOS: Advanced Modular Firmware for ESP32-C6
+# OpenC6 BIOS: Advanced Modular Firmware for ESP32-C6 / ESP32-C3
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Hardware: ESP32-C6](https://img.shields.io/badge/Hardware-ESP32--C6-red.svg)](https://www.espressif.com/en/products/socs/esp32-c6)
+[![Hardware: ESP32-C3](https://img.shields.io/badge/Hardware-ESP32--C3-red.svg)](https://www.espressif.com/en/products/socs/esp32-c3)
 [![Architecture: RISC-V](https://img.shields.io/badge/Architecture-RISC--V-orange.svg)](https://riscv.org/)
 [![Donate](https://img.shields.io/badge/Donate-Monobank-blue?logo=monobank)](https://send.monobank.ua/jar/9UcKZ4zVnu)
 
@@ -11,7 +12,9 @@
   </a>
 </p>
 
-OpenC6 BIOS is an open-source, high-performance modular platform (BIOS) for the ESP32-C6 (RISC-V) microcontroller. It decouples hardware initialization from application logic, bringing a PC/Server-like architecture to microcontrollers.
+OpenC6 BIOS is an open-source, high-performance modular platform (BIOS) for the ESP32-C6 and ESP32-C3 (RISC-V) microcontrollers, built from a single codebase that targets either chip via ESP-IDF's `CONFIG_IDF_TARGET`. It decouples hardware initialization from application logic, bringing a PC/Server-like architecture to microcontrollers.
+
+**Which target should I use?** ESP32-C6 is the primary/reference platform (LP-Core Management Engine, WiFi 6, 8 MB flash). ESP32-C3 (e.g. the low-cost "SuperMini" boards) is also supported with a few hardware-driven differences — see [Building for ESP32-C3](#building-for-esp32-c3) below.
 
 Instead of monolithic firmwares, OpenC6 acts as a host platform. It initializes the hardware, provides out-of-band management via an independent LP-Core coprocessor, and exposes a standardized System Call Interface (ABI). This allows you to hot-swap, download, and execute bare-metal Payloads directly into RAM or Execute-In-Place (XIP) Flash.
 
@@ -65,10 +68,14 @@ The architecture of OpenC6 is heavily documented. Please refer to the docs/ dire
 10. [wifi_management.md](docs/wifi_management.md) - Network stack and safe netif re-use.
 11. [openc6_fs.md](docs/openc6_fs.md) - Log-structured circular file system layout, dynamic wear leveling, and chunk-based allocation.
 12. [payload_development_serial_boot.md](docs/payload_development_serial_boot.md) - How to compile payloads and use the UART Loader.
+13. [ESP32-C3-SUPERMINI-PORT.md](ESP32-C3-SUPERMINI-PORT.md) - ESP32-C3 target: pinout differences, hardware constraints, partition layout.
+14. [QUICKSTART-ESP32-C3.md](QUICKSTART-ESP32-C3.md) - Step-by-step build/flash guide specifically for ESP32-C3 SuperMini boards.
 
 ---
 
-## Hardware Pinout (ESP32-C6-Zero / Generic C6)
+## Hardware Pinout
+
+### ESP32-C6-Zero / Generic C6
 
 | Component          | GPIO Pin                            | Description                                                        |
 | :----------------- | :---------------------------------: | :----------------------------------------------------------------- |
@@ -79,16 +86,51 @@ The architecture of OpenC6 is heavily documented. Please refer to the docs/ dire
 | **Payload RX**     | `GPIO 19` (Connect to CP2102 TX)    | Dedicated UART RX for Serial Bootloader.                           |
 | **Payload TX**     | `GPIO 18` (Connect to CP2102 RX)    | Dedicated UART TX for Serial Bootloader.                           |
 
+### ESP32-C3 SuperMini
+
+Same power button / clear-CMOS / boot / POST LED pins as C6. Only the Payload UART pins differ, since GPIO 18/19 are assigned differently on C3:
+
+| Component          | GPIO Pin                            | Description                                                        |
+| :----------------- | :---------------------------------: | :----------------------------------------------------------------- |
+| **Power Button**   | `GPIO 4` (Sense) & `GPIO 3` (GND)   | Short click: Boot. Hold 3s: Setup. Hold 5s: Hard Reset.            |
+| **BOOT Button**    | `GPIO 9`                            | Standard ESP32 BOOT pin. Hold during startup for Boot Menu.        |
+| **POST LED**       | `GPIO 8`                            | Addressable RGB (GBR layout). Used for Aura Sync and diagnostics.  |
+| **Clear CMOS**     | `GPIO 2` (Sense) & `GPIO 1` (GND)   | Short these pins during boot to reset NVRAM to factory defaults.   |
+| **Payload RX**     | `GPIO 20` (Connect to CP2102 TX)    | Dedicated UART RX for Serial Bootloader.                           |
+| **Payload TX**     | `GPIO 21` (Connect to CP2102 RX)    | Dedicated UART TX for Serial Bootloader.                           |
+
+**C3 hardware constraints:** no LP-Core (Management Engine runs in Legacy/HP-Core-only mode), no PSRAM, no EXT1/RTC-IO wakeup domain (uses plain GPIO wakeup instead), 4 MB flash (vs 8 MB on C6). WiFi is 802.11b/g/n instead of WiFi 6. See [ESP32-C3-SUPERMINI-PORT.md](ESP32-C3-SUPERMINI-PORT.md) for the full technical breakdown.
+
 ---
 
 ## Quick Start Guide
 
 ### 1. Build and Flash the BIOS
-Ensure you have the ESP-IDF (v6.1-dev) installed and sourced.
+
+Ensure you have the ESP-IDF (v6.1-dev) installed and sourced. `sdkconfig.defaults` defaults to **ESP32-C6** (primary target, 8 MB flash); ESP32-C3 SuperMini (4 MB flash) is also fully supported from the same codebase.
+
+`scripts/build.sh` and `scripts/flash.sh` handle target selection, flash size, and partition table for you — no manual `sdkconfig` edits needed:
+
 ```bash
 . $IDF_PATH/export.sh
+
+scripts/build.sh c6      # or: scripts/build.sh c3
+scripts/flash.sh          # auto-detects the serial port; retries if it flaps
+idf.py monitor -p /dev/ttyACM0    # (or the port scripts/flash.sh reported)
+```
+
+`scripts/flash.sh` accepts an explicit port and retry-timeout too: `scripts/flash.sh /dev/cu.usbmodem101 60`. This matters on ESP32-C3 SuperMini boards in particular, which can drop off USB during a brownout/reset cycle — see the Power note below.
+
+Prefer plain `idf.py` commands? That still works:
+```bash
+idf.py set-target esp32c6    # or esp32c3
 idf.py build flash monitor -p /dev/ttyACM0
 ```
+For C3, you'll additionally need to point `sdkconfig` at the 4 MB flash size and `partitions_c3_4mb.csv` — `scripts/build.sh c3` does this for you; see its source if doing it by hand.
+
+See [QUICKSTART-ESP32-C3.md](QUICKSTART-ESP32-C3.md) for the full C3 step-by-step (including the C3-specific pinout above) and [ESP32-C3-SUPERMINI-PORT.md](ESP32-C3-SUPERMINI-PORT.md) for the technical rationale behind each C6/C3 difference.
+
+**Power note:** ESP32-C3 SuperMini boards draw a real current spike when WiFi/flash-erase kicks in. If flashing over a laptop USB port causes the board to reset-loop or drop off USB, power it from a USB wall charger or powered hub instead — this is a hardware power-delivery limit, not a firmware issue.
 
 ### 2. Build the Bare-Metal Payload
 Navigate to the tools/ directory to compile the C++ host loader and the RISC-V payload.

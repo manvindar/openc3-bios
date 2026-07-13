@@ -7,7 +7,10 @@
 // --- Service / Utility GPIO Pins ---
 #define PIN_CMOS_GND     1   // Software Ground for Clear CMOS jumper
 #define PIN_CLEAR_NVRAM  2   // Clear CMOS jumper sensor pin (Active Low)
-#define PIN_POST_LED     8   // Onboard POST LED (Common on dev boards)
+
+// --- POST LED Pin (Board-specific) ---
+// Both C6 and C3 SuperMini here use GPIO8 for the addressable RGB LED.
+#define PIN_POST_LED     8
 
 void bios_core_start(void);
 void bios_enter_s5_state(void);
