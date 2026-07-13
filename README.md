@@ -1,4 +1,4 @@
-# OpenC6 BIOS: Advanced Modular Firmware for ESP32-C6 / ESP32-C3
+# OpenC3/C6 BIOS: Advanced Modular Firmware for ESP32-C6 / ESP32-C3
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Hardware: ESP32-C6](https://img.shields.io/badge/Hardware-ESP32--C6-red.svg)](https://www.espressif.com/en/products/socs/esp32-c6)
