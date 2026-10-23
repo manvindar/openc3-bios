@@ -1,9 +1,10 @@
-# OpenC3/C6 BIOS: Advanced Modular Firmware for ESP32-C6 / ESP32-C3
+# OpenC6 BIOS: Advanced Modular Firmware and Microkernel for ESP32-C6
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Hardware: ESP32-C6](https://img.shields.io/badge/Hardware-ESP32--C6-red.svg)](https://www.espressif.com/en/products/socs/esp32-c6)
 [![Hardware: ESP32-C3](https://img.shields.io/badge/Hardware-ESP32--C3-red.svg)](https://www.espressif.com/en/products/socs/esp32-c3)
 [![Architecture: RISC-V](https://img.shields.io/badge/Architecture-RISC--V-orange.svg)](https://riscv.org/)
+[![Reddit: r/OpenC6](https://img.shields.io/badge/Reddit-r%2FOpenC6-FF4500?logo=reddit&logoColor=white)](https://reddit.com/r/OpenC6)
 [![Donate](https://img.shields.io/badge/Donate-Monobank-blue?logo=monobank)](https://send.monobank.ua/jar/9UcKZ4zVnu)
 
 <p align="center">
@@ -12,201 +13,278 @@
   </a>
 </p>
 
-OpenC6 BIOS is an open-source, high-performance modular platform (BIOS) for the ESP32-C6 and ESP32-C3 (RISC-V) microcontrollers, built from a single codebase that targets either chip via ESP-IDF's `CONFIG_IDF_TARGET`. It decouples hardware initialization from application logic, bringing a PC/Server-like architecture to microcontrollers.
+OpenC6 is an open-source, high-performance BIOS and microkernel architecture designed for the ESP32-C6 (RV32IMAC). It decouples platform-level hardware initialization from user-space execution, bringing PC/Workstation architecture paradigms to microcontrollers.
 
-**Which target should I use?** ESP32-C6 is the primary/reference platform (LP-Core Management Engine, WiFi 6, 8 MB flash). ESP32-C3 (e.g. the low-cost "SuperMini" boards) is also supported with a few hardware-driven differences — see [Building for ESP32-C3](#building-for-esp32-c3) below.
+Instead of deploying monolithic firmwares, OpenC6 acts as an operating host. It manages bare-metal silicon resources, runs an autonomous out-of-band supervisor on the LP-Core coprocessor, enforces hardware memory protection via Physical Memory Protection (PMP), and exposes a standardized System Call ABI. This allows dynamic loading, multitasking execution, and network deployment of unprivileged User-Mode (U-Mode) payloads without recompiling the host operating system.
 
-Instead of monolithic firmwares, OpenC6 acts as a host platform. It initializes the hardware, provides out-of-band management via an independent LP-Core coprocessor, and exposes a standardized System Call Interface (ABI). This allows you to hot-swap, download, and execute bare-metal Payloads directly into RAM or Execute-In-Place (XIP) Flash.
-
----
-
-## Visual Demos
-
-### 1. Retro Web Setup Utility (1280x1024 5:4 Native Look)
-Nostalgic classic PC BIOS running on ESP32-C6 via local Wi-Fi.
-![OpenC6 Web UI Setup](docs/assets/web_setup.gif)
-
-### 2. Micro UNIX Shell (Interactive File System Explorer)
-Inspect, read, write, and execute files directly on the custom log-structured flash file system via the serial terminal.
-![OpenC6 UNIX Shell](docs/assets/unix_shell.jpg)
-
-### 3. Wireless BIOS Firmware Update (OTA)
-Safe wireless BIOS flashing over Wi-Fi with hardware A/B partition rollback protection.
-![OpenC6 BIOS Update](docs/assets/bios_update.jpg)
-
-### 4. Aura Sync RGB Flow (Dynamic Hardware Diagnostics)
-Real-time addressable POST LED smoothly cycling colors (Aura Sync) and flashing post codes during hardware initialization.
-![OpenC6 Aura Sync](docs/assets/aura_sync.gif)
+**Which target should I use?** ESP32-C6 is the primary/reference platform (LP-Core Management Engine, WiFi 6, 8 MB flash). ESP32-C3 (e.g. the low-cost "SuperMini" boards) is built from the same codebase via ESP-IDF's `CONFIG_IDF_TARGET`, with a few hardware-driven differences — see [ESP32-C3 SuperMini](#esp32-c3-supermini) below.
 
 ---
 
-## Key Architectural Features
+## Visual Demonstration
 
-* **LP-Core Management Engine (ME):** An autonomous out-of-band RISC-V coprocessor that monitors system health, reads the power button, handles hardware Watchdogs, and triggers emergency thermal shutdowns even if the main OS crashes.
-* **SchedUtil Dynamic Governor:** Real-time load-adaptive CPU frequency scaling (80/120/160 MHz) calculated via FreeRTOS idle cycles.
-* **Network Boot (PXE):** Dynamically fetch and execute bare-metal payloads over Wi-Fi without wearing out the flash memory using physical USB tools.
-* **Anti-Brick A/B OTA:** Network updates for the BIOS itself are protected by hardware rollback mechanisms.
-* **Retro Web Setup Utility:** An integrated AP-mode web server with a classic blue-screen BIOS interface for AI Tweaker configurations (Overclocking, BOD levels, Thermal limits).
-* **Standardized ABI:** Payloads compile without ESP-IDF (-nostdlib -fPIC), weighing only 2-10 KB, while utilizing BIOS-provided Wi-Fi, Math, and Crypto engines.
-* **Log-Structured Circular File System (openc6_fs):** A custom chunk-based file system with dynamic wear leveling and dynamic RAM indexing that supports files larger than a single sector.
+### 1. Retro BIOS Web Setup Utility
+Classic 5:4 blue-screen configuration utility hosted directly on ESP32-C6 via standalone AP mode (192.168.4.1).
+![OpenC6 Web Setup](assets/web_setup.gif)
+
+### 2. Preemptive Multitasking & Telemetry (top)
+Local Micro UNIX Shell monitoring active process states, dynamic 4 KB page allocation, CPU load, and governor state.
+![OpenC6 Process Manager](assets/top.jpg)
+
+### 3. Remote Web Shell (c6wsh)
+Lightweight streaming terminal interface running on port 80 over local Wi-Fi.
+![OpenC6 Remote Web Shell](assets/c6wsh.jpg)
+
+### 4. Hardware PMP Isolation & Trap Interception
+Real-time register dump and fault diagnosis when an untrusted U-Mode binary attempts illegal memory access.
+![OpenC6 PMP Isolation](assets/pmp.jpg)
+
+### 5. Wireless BIOS Firmware Update (OTA)
+Safe host firmware flashing over Wi-Fi backed by hardware A/B partition rollback logic.
+![OpenC6 BIOS Update](assets/bios_update.jpg)
+
+### 6. Dynamic Aura Sync & POST Diagnostics
+Single-cycle atomic WS2812 driver scaling pulse timings to match active CPU frequency (80/120/160 MHz).
+![OpenC6 Aura Sync](assets/aura_sync.gif)
+
+### 7. Automated C99 TUI Installer
+Freestanding zero-dependency terminal setup wizard automating host prerequisites and ESP-IDF v6.1 deployment.
+![OpenC6 Automated Installer](assets/installer.jpg)
+
+### 8. ZSWAP In-Memory Page Compression
+Suspended background process memory pages compressed in RAM via the custom ZC6 v4 engine (12 KB process compressed down to 1055 B, releasing 10 KB of physical arena pages back to the pool).
+![OpenC6 ZSWAP Compression](assets/zswap.jpg)
 
 ---
 
-## Comprehensive Documentation
+## Key Architectural Systems
 
-The architecture of OpenC6 is heavily documented. Please refer to the docs/ directory for deep technical dives into each subsystem:
+### 1. Hardware PMP Isolation (U-Mode Sandbox)
+User applications execute strictly in unprivileged RISC-V User Mode (`U-Mode`). Top-of-Range (`TOR`) Physical Memory Protection registers isolate the execution arena from the host:
+* Kernel DRAM, host execution stacks, and internal subsystem memory are strictly unreadable and unexecutable to payloads.
+* Direct access to MMIO peripheral registers (`0x60000000+`) is hardware-blocked (Default Deny).
+* Safe syscall dispatch via machine-level `ecall` with atomic stack switching via `mscratch`.
+* Custom interrupt vector trampoline (`sandbox_intr_trampoline`) resolves FreeRTOS context-switch privilege leakage bugs on RISC-V.
+* **Role of FreeRTOS:** FreeRTOS is retained strictly as an underlying thread scheduler and transport layer required by Espressif's proprietary Wi-Fi baseband blobs (`libnet80211`). OpenC6 bypasses FreeRTOS primitives for process isolation, memory allocation, virtual filesystems, and trap handling, operating as a true microkernel supervisor over bare-metal RISC-V hardware.
 
-1. [bios_core.md](docs/bios_core.md) - State machine, Boot Dispatcher & System ABI.
-2. [main_entry_point.md](docs/main_entry_point.md) - Host initialization vector and application entry.
-3. [management_engine.md](docs/management_engine.md) - LP-Core IPC, Watchdogs, and Power Button logic.
-4. [power_management.md](docs/power_management.md) - AI Tweaker, Brownout Detector (BOD), and SchedUtil.
-5. [boot_manager.md](docs/boot_manager.md) - Interactive Boot Menu and Serial Protocol.
-6. [pxe_network_boot.md](docs/pxe_network_boot.md) - Network Boot and OTA specifications.
-7. [nvram.md](docs/nvram.md) - Virtual CMOS database schema and Clear CMOS routines.
-8. [led_management.md](docs/led_management.md) - Aura Sync RGB and POST Diagnostics.
-9. [bios_setup_web_ui.md](docs/bios_setup_web_ui.md) - REST API and Retro Web Configurator.
-10. [wifi_management.md](docs/wifi_management.md) - Network stack and safe netif re-use.
-11. [openc6_fs.md](docs/openc6_fs.md) - Log-structured circular file system layout, dynamic wear leveling, and chunk-based allocation.
-12. [payload_development_serial_boot.md](docs/payload_development_serial_boot.md) - How to compile payloads and use the UART Loader.
-13. [ESP32-C3-SUPERMINI-PORT.md](ESP32-C3-SUPERMINI-PORT.md) - ESP32-C3 target: pinout differences, hardware constraints, partition layout.
-14. [QUICKSTART-ESP32-C3.md](QUICKSTART-ESP32-C3.md) - Step-by-step build/flash guide specifically for ESP32-C3 SuperMini boards.
+### 2. Autonomous Management Engine (LP-Core ME)
+An out-of-band supervisor running independently on the Low-Power (ULP) RISC-V coprocessor:
+* Hardware Watchdog monitoring main core execution (15-second hardware timeout).
+* Junction temperature tracking via on-die TSENS: thermal throttling down to 80 MHz at 55 deg C, emergency hardware soft-off (`LP_WDT`) at 75 deg C.
+* Power button handling with leaky-bucket debouncing (3-second hold triggers hardware force reset).
+
+### 3. Hardware SchedUtil Frequency Governor
+Autonomous CPU frequency scaling running on the LP-Core:
+* Measures run-time load via a zero-overhead FreeRTOS SysTick hook operating strictly out of internal DRAM (immune to Flash cache disable stalls).
+* Directly switches HP CPU frequency dividers across 80, 120, and 160 MHz using hardware PCR registers (`0x60096118`).
+* Asymmetric hysteresis: instant step-up upon load spikes, 1000 ms hold prior to downscaling.
+
+### 4. Process Manager & ZSWAP Engine
+Preemptive job control supporting up to 8 concurrent processes:
+* Dynamic memory allocator managing a pool of contiguous 4 KB pages using Next-Fit arbitration.
+* Full shell job control: background execution (`boot <path> bg`), foreground management (`fg`, `bg`), process suspension, and termination (`kill`).
+* **ZSWAP Architecture:** Suspended processes (`Ctrl+X`) have their memory pages compressed into RAM via the custom **ZC6** algorithm (~1.2 KB match-finder footprint), releasing physical 4 KB pages back to the arena.
+* **Transparent Execution:** Binaries compressed as `.zc6` archives on flash are decompressed into RAM on the fly prior to launch.
+
+### 5. Log-Structured Circular Flash VFS (openc6_fs)
+High-performance circular filesystem residing in a dedicated SPI Flash partition:
+* Fast RAM-backed directory index (`RamNode`) with dynamic chunk-based caching.
+* Automatic background garbage collection (`gc_step`) with sector-erase watchdog yielding.
+* Native directory hierarchy supporting standard POSIX operations (`ls`, `cd`, `mkdir`, `cat`, `write`, `cp`, `mv`, `rm`).
+
+### 6. Dual Management Console
+* **Local Terminal:** Micro UNIX Shell hosted over native USB-Serial-JTAG CDC (immunity against host DTR/RTS auto-reset drops).
+* **Remote Web Shell (`c6wsh`):** Non-blocking HTTP console on port 80 with chunked output streaming and input queue multiplexing.
 
 ---
 
-## Hardware Pinout
+## Hardware Pinout (ESP32-C6-Zero / Generic C6)
 
-### ESP32-C6-Zero / Generic C6
-
-| Component          | GPIO Pin                            | Description                                                        |
-| :----------------- | :---------------------------------: | :----------------------------------------------------------------- |
-| **Power Button**   | `GPIO 4` (Sense) & `GPIO 3` (GND)   | Short click: Boot. Hold 3s: Setup. Hold 5s: Hard Reset.            |
-| **BOOT Button**    | `GPIO 9`                            | Standard ESP32 BOOT pin. Hold during startup for Boot Menu.        |
-| **POST LED**       | `GPIO 8`                            | Addressable RGB (GBR layout). Used for Aura Sync and diagnostics.  |
-| **Clear CMOS**     | `GPIO 2` (Sense) & `GPIO 1` (GND)   | Short these pins during boot to reset NVRAM to factory defaults.   |
-| **Payload RX**     | `GPIO 19` (Connect to CP2102 TX)    | Dedicated UART RX for Serial Bootloader.                           |
-| **Payload TX**     | `GPIO 18` (Connect to CP2102 RX)    | Dedicated UART TX for Serial Bootloader.                           |
+| Pin | Identifier | Hardware Function | Description |
+|---|---|---|---|
+| **GPIO 3** | `PIN_BTN_GND` | Output (0V) | Virtual ground latch for power button |
+| **GPIO 4** | `PIN_BTN_SENSE` | Input (Pull-Up) | Power sense line (Wakeup / 3s Reset / Setup trigger) |
+| **GPIO 8** | `WS2812_GPIO` | Output | Addressable RGB POST diagnostics & Aura Sync LED |
+| **GPIO 9** | `PIN_BTN_BOOT` | Input (Pull-Up) | Physical BOOT button; hold during power-on for Boot Menu |
+| **GPIO 1, 2** | `CLEAR_NVRAM` | Input / Ground | Hardware Clear CMOS jumper (Short during boot to reset) |
+| **Type-C** | Native USB | D- / D+ PHY | Direct USB CDC console, binary loader, and JTAG |
 
 ### ESP32-C3 SuperMini
 
-Same power button / clear-CMOS / boot / POST LED pins as C6. Only the Payload UART pins differ, since GPIO 18/19 are assigned differently on C3:
+Same power button / clear-CMOS / boot / POST LED pins as C6.
 
-| Component          | GPIO Pin                            | Description                                                        |
-| :----------------- | :---------------------------------: | :----------------------------------------------------------------- |
-| **Power Button**   | `GPIO 4` (Sense) & `GPIO 3` (GND)   | Short click: Boot. Hold 3s: Setup. Hold 5s: Hard Reset.            |
-| **BOOT Button**    | `GPIO 9`                            | Standard ESP32 BOOT pin. Hold during startup for Boot Menu.        |
-| **POST LED**       | `GPIO 8`                            | Addressable RGB (GBR layout). Used for Aura Sync and diagnostics.  |
-| **Clear CMOS**     | `GPIO 2` (Sense) & `GPIO 1` (GND)   | Short these pins during boot to reset NVRAM to factory defaults.   |
-| **Payload RX**     | `GPIO 20` (Connect to CP2102 TX)    | Dedicated UART RX for Serial Bootloader.                           |
-| **Payload TX**     | `GPIO 21` (Connect to CP2102 RX)    | Dedicated UART TX for Serial Bootloader.                           |
+**C3 hardware constraints:** no LP-Core (Management Engine runs in Legacy/HP-Core-only mode), no PSRAM, no EXT1/RTC-IO wakeup domain (uses plain GPIO wakeup instead), 4 MB flash (vs 8 MB on C6). WiFi is 802.11b/g/n instead of WiFi 6. See [ESP32-C3-SUPERMINI-PORT.md](ESP32-C3-SUPERMINI-PORT.md) for the full technical breakdown and [QUICKSTART-ESP32-C3.md](QUICKSTART-ESP32-C3.md) for a step-by-step C3 guide.
 
-**C3 hardware constraints:** no LP-Core (Management Engine runs in Legacy/HP-Core-only mode), no PSRAM, no EXT1/RTC-IO wakeup domain (uses plain GPIO wakeup instead), 4 MB flash (vs 8 MB on C6). WiFi is 802.11b/g/n instead of WiFi 6. See [ESP32-C3-SUPERMINI-PORT.md](ESP32-C3-SUPERMINI-PORT.md) for the full technical breakdown.
+---
+
+## Micro UNIX Shell Command Reference
+
+Connect to the USB Type-C interface using any serial monitor (115200 baud, 8N1):
+
+### System & Diagnostics
+* `help` - Display available shell commands.
+* `info` - View hardware CPU frequency, governor load, tick counts, temperature, and ME state.
+* `mem` - Display dynamic arena capacity and internal DRAM allocation.
+* `top` - Display process table, CPU governor metrics, and page pool status.
+* `reboot` - Warm restart of the processor.
+* `poweroff` / `exit` - Terminate running processes and enter S5 Soft-Off state.
+
+### Process & Job Control
+* `boot <path> [bg]` - Execute binary in foreground or background (`bg` or `&`).
+* `fg <pid>` - Bring background or suspended process to foreground.
+* `bg <pid>` - Resume suspended process in background.
+* `suspend [pid]` - Suspend running process and compress memory via ZSWAP (`Ctrl+X` in console).
+* `kill <pid>` - Terminate process and cleanly release socket descriptors.
+
+### Binary Transfer & Networking
+* `serial [path]` - Receive binary over USB CDC via `openc6_loader` (Default: `/downloaded/payload.bin`).
+* `pxe <url>` - Download payload over Wi-Fi directly into Flash storage.
+* `wifi scan` - Scan 2.4 GHz spectrum (Channels 1-13) and print RSSI table.
+* `wifi connect <ssid> [pass]` - Associate with AP and commit credentials to NVRAM.
+* `wifi status` - Print MAC address, L3 IPv4 address, and link parameters.
+* `wifi disconnect` - Disconnect station interface.
+
+### File System Operations
+* `ls [path]` - List directory contents.
+* `cd <path>` - Change active directory.
+* `mkdir <path>` - Create directory node.
+* `cat <path>` - Print file contents.
+* `write <path> <text>` - Write text stream to file.
+* `cp <src> <dst>` - Duplicate file.
+* `mv <src> <dst>` - Move or rename file.
+* `rm <path>` - Delete file or empty directory node.
+* `format` - Erase filesystem partition and initialize blank ring structure.
 
 ---
 
 ## Quick Start Guide
 
-### 1. Build and Flash the BIOS
+### 1. Automated Installation (Recommended)
+OpenC6 features a standalone C99 TUI deployment wizard that automatically configures host prerequisites, installs the ESP-IDF v6.1 RISC-V toolchain, compiles the BIOS, wipes stale flash partitions, and programs the target hardware.
 
-Ensure you have the ESP-IDF (v6.1-dev) installed and sourced. `sdkconfig.defaults` defaults to **ESP32-C6** (primary target, 8 MB flash); ESP32-C3 SuperMini (4 MB flash) is also fully supported from the same codebase.
+![OpenC6 Build Execution](assets/installer_build.jpg)
 
-`scripts/build.sh` and `scripts/flash.sh` handle target selection, flash size, and partition table for you — no manual `sdkconfig` edits needed:
+Ensure `make` is installed on your host system:
+```bash
+# Arch Linux / Manjaro
+sudo pacman -S make
 
+# Ubuntu / Debian
+sudo apt update && sudo apt install -y make
+```
+
+Clone the repository and launch the automated setup wizard:
+```bash
+git clone https://github.com/Rompass/openc6-bios.git
+cd openc6-bios
+make setup
+```
+
+### 2. Manual Build and Flash (Advanced)
+If you already have ESP-IDF v6.1+ configured and sourced in your active shell:
 ```bash
 . $IDF_PATH/export.sh
+idf.py build erase-flash flash monitor -p /dev/ttyACM0
+```
 
+`sdkconfig.defaults` targets **ESP32-C6**. For ESP32-C3 SuperMini (4 MB flash), `scripts/build.sh` handles target, flash size and partition table:
+```bash
 scripts/build.sh c6      # or: scripts/build.sh c3
-scripts/flash.sh          # auto-detects the serial port; retries if it flaps
-idf.py monitor -p /dev/ttyACM0    # (or the port scripts/flash.sh reported)
+scripts/flash.sh         # auto-detects the serial port; optional args: <port> <retry-timeout>
 ```
 
-`scripts/flash.sh` accepts an explicit port and retry-timeout too: `scripts/flash.sh /dev/cu.usbmodem101 60`. This matters on ESP32-C3 SuperMini boards in particular, which can drop off USB during a brownout/reset cycle — see the Power note below.
+**Power note:** ESP32-C3 SuperMini boards draw a real current spike when WiFi/flash-erase kicks in. If flashing over a laptop USB port causes a reset loop or the board drops off USB, power it from a wall charger or powered hub instead.
 
-Prefer plain `idf.py` commands? That still works:
+### 3. Build Host Utilities and Target Payloads
+The `tools/` directory includes an automated build system that compiles host utilities (`openc6_loader`, `zc6_pack`) alongside bare-metal RISC-V payloads in `tools/example/*.c`:
+
 ```bash
-idf.py set-target esp32c6    # or esp32c3
-idf.py build flash monitor -p /dev/ttyACM0
-```
-For C3, you'll additionally need to point `sdkconfig` at the 4 MB flash size and `partitions_c3_4mb.csv` — `scripts/build.sh c3` does this for you; see its source if doing it by hand.
+cd tools
 
-See [QUICKSTART-ESP32-C3.md](QUICKSTART-ESP32-C3.md) for the full C3 step-by-step (including the C3-specific pinout above) and [ESP32-C3-SUPERMINI-PORT.md](ESP32-C3-SUPERMINI-PORT.md) for the technical rationale behind each C6/C3 difference.
-
-**Power note:** ESP32-C3 SuperMini boards draw a real current spike when WiFi/flash-erase kicks in. If flashing over a laptop USB port causes the board to reset-loop or drop off USB, power it from a USB wall charger or powered hub instead — this is a hardware power-delivery limit, not a firmware issue.
-
-### 2. Build the Bare-Metal Payload
-Navigate to the tools/ directory to compile the C++ host loader and the RISC-V payload.
-```bash
-cd tools/
-mkdir build && cd build
-cmake ..
+# Builds host tools and cross-compiles all example/*.c payloads
 make
 ```
-See [payload_development_serial_boot.md](docs/payload_development_serial_boot.md) for instructions on deploying via the UART Serial Loader.
+
+Build outputs are placed in `tools/build/bin/`:
+* `tools/build/bin/openc6_loader` — Host deployment utility.
+* `tools/build/bin/zc6_pack` — ZC6 payload compression tool.
+* `tools/build/bin/payloads/*.bin` — Compiled flat RISC-V binary payloads.
+
+### 4. Deploy and Run Payloads via Serial (Type-C)
+To stream and execute a compiled payload over the native USB CDC interface:
+
+```bash
+# 1. In the OpenC6 interactive shell, arm the receiver:
+openc6_fs [Dir: 0] /> serial
+
+# 2. On your host machine, stream the generated binary:
+./tools/build/bin/openc6_loader /dev/ttyACM0 tools/build/bin/payloads/payload.bin
+
+# 3. Launch the deployed binary in the U-Mode Sandbox:
+openc6_fs [Dir: 0] /> boot /downloaded/payload.bin
+```
+
+To run the payload as a preemptive background job:
+```bash
+openc6_fs [Dir: 0] /> boot /downloaded/payload.bin bg
+```
 
 ---
 
-## Network Booting & OTA Updates
+## Network Booting (PXE) and BIOS Updates
 
-OpenC6 allows you to download Payloads or update the BIOS entirely over your home Wi-Fi using a simple local Python web server.
+OpenC6 supports network payload loading and full host updates over Wi-Fi:
 
 ### Method A: Network Booting a Payload (PXE)
-This method downloads payload.bin into Flash (XIP) and boots it.
-
-1. Open a terminal on your PC, navigate to the tools/ directory (where your compiled payload.bin is located), and start a local HTTP server:
+1. Host compiled payload on your workstation:
    ```bash
    python3 -m http.server 8080
    ```
-2. Power on the ESP32-C6 and enter BIOS Setup (Hold Power Button for 3s OR hold BOOT to enter the menu and select the 5th option).
-3. Connect your phone/PC to the BIOS_SETUP_C6 Wi-Fi network (Password: 12345678) and open http://192.168.4.1.
-4. Enter your home Wi-Fi SSID and Password.
-5. Set the PXE Server URL to your PC's local IP:
+2. In the OpenC6 shell, fetch the payload:
    ```text
-   http://<YOUR_PC_LOCAL_IP>:8080/payload.bin
+   openc6_fs [Dir: 0] /> pxe http://<HOST_IP>:8080/payload.bin
    ```
-6. Click [ F10: Save & Exit ].
-7. While the board reboots, hold the BOOT (GPIO 9) button to open the Interactive Menu.
-8. Select [0] Network Boot (PXE) (1 blink). The BIOS will connect to your router, download the payload, and execute it.
+3. Launch the downloaded image:
+   ```text
+   openc6_fs [Dir: 0] /> boot /downloaded/payload.bin
+   ```
 
 ### Method B: Wireless BIOS Firmware Update (OTA)
-This method safely reflashes the core openc6_bios.bin (the host system) using hardware A/B partition rollback protection.
-
-1. Compile your new BIOS using `idf.py build`.
-2. Navigate to the ESP-IDF build/ directory in the root of the project.
-3. Start the Python server there:
-   ```bash
-   python3 -m http.server 8080
-   ```
-4. Enter the BIOS Setup Web UI (192.168.4.1) as described above. Ensure Wi-Fi credentials are correct.
-5. Change the PXE Server URL to point to the newly compiled BIOS binary:
-   ```text
-   http://<YOUR_PC_LOCAL_IP>:8080/openc6_bios.bin
-   ```
-   *(Note: Replace openc6_bios.bin with your actual project binary name)*.
-6. Click [ F10: Save & Exit ].
-7. Wait for the board to reboot, then enter the BIOS Setup Web UI again.
-8. Click the [ F12: Network BIOS Update ] button.
-9. The system will restart, connect to your router, download the new BIOS into the passive OTA slot, and reboot.
-
-Anti-Brick Safety: If the new BIOS crashes, the LP-Core Watchdog will trigger a hardware reset, and the ESP32 bootloader will automatically roll back to the previous stable version!
+1. Build the updated BIOS (`idf.py build`) and serve `openc6_bios.bin` over HTTP.
+2. Enter the BIOS Setup Web UI (Hold power button for 3s during power-on or boot menu, connect to `BIOS_SETUP_C6`, open `http://192.168.4.1`).
+3. Set the PXE Server URL to your firmware binary endpoint.
+4. Click **[ F12: Network BIOS Update ]**.
+5. The system downloads the binary into the passive OTA slot, verifies partition integrity, marks the boot slot, and restarts. In case of boot failure, hardware watchdog initiates automatic rollback.
 
 ---
 
-## Roadmap & Known Issues (Help Wanted!)
+## Payload Development
 
-This project is actively evolving. Pull requests and community contributions are highly welcome for the following milestones:
+For complete architectural specifications, memory maps, system call tables, C runtime examples, and compiler flags:
 
-* **ESP32-P4 Porting (Active Focus):** We are actively porting the OpenC6 BIOS platform to the high-performance ESP32-P4 (dual-core RISC-V, parallel display support, MIPI-DSI). We welcome the community to contribute to this port, especially in writing the parallel display driver, setting up the hardware layouts, and adapting the retro setup GUI.
-* **~~Custom Open-Source File System~~:** ~~Designing a lightweight, entirely new file system from scratch, exposing storage read/write capabilities directly to payloads via the BIOS ABI structure.~~ (Completed with `openc6_fs` chunked allocation support)
-* **Custom zRAM Implementation:** Developing a brand-new, custom high-speed compression algorithm specifically tailored for the RISC-V architecture to expand SRAM execution memory for complex payloads.
-* **Security Validation:** Adding SHA256 checksum verification to PXE and Serial Boot payload transfers to prevent corrupted executions.
-* **Watchdog Delegation:** Exposing the pet_watchdog() function to the ABI so payloads can be monitored for thread-locks.
+Refer to **[Payload Development & ABI Reference](docs/payload_development.md)**.
+
+---
+
+## Project Roadmap
+
+* **Unified Hardware Abstraction Layer (HAL):** Decoupling architecture-specific drivers (PMP, LP-Core coprocessor, PCR registers, USB CDC) into a modular HAL interface to enable flexible porting across other RISC-V platforms and targets.
+
+---
+
+## Community
+
+Discussions, payload showcases, hardware hacking experiments, and announcements are hosted on our official subreddit:
+
+**Join the discussion on Reddit: [r/OpenC6](https://reddit.com/r/OpenC6)**
 
 ---
 
 ## License
 
-This project is licensed under the MIT License. See the LICENSE file for details. Let's change the embedded development paradigm together!
+This project is licensed under the MIT License. See `LICENSE` for details.
 
 ---
 
-## 🇺🇦 Stand with Ukraine
-This project supports Ukraine's fight for freedom. Consider donating to verified charities like [Come Back Alive](https://savelife.in.ua/en/).
+## Stand with Ukraine
+This project was developed in Ukraine. Consider supporting verified charities such as [Come Back Alive](https://savelife.in.ua/en/) to aid the defense against Russian aggression.
