@@ -105,10 +105,10 @@ just configured (e.g. Network Boot). Normal boot flow — respecting NVRAM's
 
 Since the HAL refactor, the BIOS console and serial payload loader use direct
 USB-Serial-JTAG register access in `components/openc6_hal/include/hw_usb.h`,
-with addresses hard-coded for the C6 (`0x6000F000` base). The C3 has the same
-peripheral at a different base address, so `hw_usb.h` has not been made
-target-specific and **the C3 build has not been re-validated since the merge
-with the refactor**. The checklist below predates it.
+with addresses taken from the ESP32-C6 TRM (USB-Serial-JTAG at `0x6000F000`,
+clock/reset via the C6-only PCR block at `0x6009608C`). The C3 has a different
+register map for both, so `hw_usb.h` has not been made target-specific and
+**the C3 build has not been re-validated since the merge with the refactor**. The checklist below predates it.
 
 ## Testing checklist
 
