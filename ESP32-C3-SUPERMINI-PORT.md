@@ -20,25 +20,24 @@ instructions, see [QUICKSTART-ESP32-C3.md](QUICKSTART-ESP32-C3.md).
 ## Pin mapping
 
 Power button, clear-CMOS, BOOT, and POST LED pins are identical on both
-targets (GPIO 8 works fine as a general-purpose pin on C3 too). Only the
-payload UART moves, because GPIO 18/19 are assigned differently on C3:
+targets (GPIO 8 works fine as a general-purpose pin on C3 too). The serial
+payload loader runs over the board's native USB (no external UART adapter
+or dedicated pins on either target). Only the AP SSID differs:
 
 | Function | C6 | C3 | Why it moved |
 |---|---|---|---|
 | POST LED | GPIO 8 | GPIO 8 | unchanged |
-| Payload UART TX | GPIO 18 | **GPIO 21** | UART1 pin assignment differs on C3 |
-| Payload UART RX | GPIO 19 | **GPIO 20** | UART1 pin assignment differs on C3 |
 | Power button / GND | GPIO 4 / 3 | GPIO 4 / 3 | unchanged |
 | Clear NVRAM / GND | GPIO 2 / 1 | GPIO 2 / 1 | unchanged |
 | BOOT button | GPIO 9 | GPIO 9 | unchanged |
 | WiFi Setup AP SSID | `BIOS_SETUP_C6` | `BIOS_SETUP_C3` | cosmetic, so you can tell targets apart over WiFi |
 
-Payload UART pin/SSID selection is done at compile time via `#ifdef CONFIG_IDF_TARGET_ESP32C3` — no runtime detection needed.
+SSID selection is done at compile time via `#ifdef CONFIG_IDF_TARGET_ESP32C3` — no runtime detection needed.
 
 ## What had to change in code
 
-### 1. GPIO pins (`components/bios_core/include/bios_core.h`, `components/boot_manager/boot_menu.c`)
-`PIN_POST_LED` is unconditional (GPIO 8 on both targets). `EXTERNAL_UART_TX_PIN`/`RX_PIN` and the AP SSID use conditional `#define`s guarded by `CONFIG_IDF_TARGET_ESP32C3`.
+### 1. GPIO pins / SSID (`components/bios_core/include/bios_core.h`, `components/bios_core/bios_init.c`)
+`PIN_POST_LED` is unconditional (GPIO 8 on both targets). The AP SSID uses a conditional `#define` guarded by `CONFIG_IDF_TARGET_ESP32C3`.
 
 ### 2. Management Engine / LP-Core (`components/management_engine/`)
 C3 has no LP-Core, so the ULP binary can't be built or deployed there:
@@ -102,6 +101,15 @@ always-Setup logic intercepted the reboot and ignored whatever the user had
 just configured (e.g. Network Boot). Normal boot flow — respecting NVRAM's
 `DC_LOSS_ACTION` and the BOOT-button interactive menu — is restored.
 
+## Known limitation: native USB registers (unverified on C3)
+
+Since the HAL refactor, the BIOS console and serial payload loader use direct
+USB-Serial-JTAG register access in `components/openc6_hal/include/hw_usb.h`,
+with addresses hard-coded for the C6 (`0x6000F000` base). The C3 has the same
+peripheral at a different base address, so `hw_usb.h` has not been made
+target-specific and **the C3 build has not been re-validated since the merge
+with the refactor**. The checklist below predates it.
+
 ## Testing checklist
 
 - [x] Builds cleanly for `esp32c3` target
@@ -112,7 +120,7 @@ just configured (e.g. Network Boot). Normal boot flow — respecting NVRAM's
 - [x] WiFi STA connects to a WPA2-PSK home network
 - [x] Network boot (PXE): downloads `payload.bin` over HTTP, saves to `openc6_fs`
 - [x] RAM payload execution: BIOS jumps to downloaded payload, ABI calls (malloc, SHA-256, TRNG, math, WiFi, RGB) all work, payload returns cleanly and BIOS reboots
-- [ ] Serial payload bootloader (GPIO 20/21) — not yet exercised on C3
+- [ ] Serial payload bootloader (native USB) — not yet exercised on C3; see Known limitation below
 - [ ] OTA update + rollback — not yet exercised on C3
 
 ### Confirmed working end-to-end (2026-07-13)

@@ -8,7 +8,6 @@ for the technical rationale behind each difference below.
 
 - ESP32-C3 SuperMini board
 - ESP-IDF v6.1 installed and sourced
-- USB-to-UART adapter (CP2102 or similar) — only needed for the serial payload bootloader, not for flashing the BIOS itself (that uses the board's native USB-CDC/JTAG)
 - **A USB wall charger or powered hub.** Laptop USB ports frequently can't supply the current spike the board draws when WiFi/NVS-flash-erase kick in, causing brownout resets or the board dropping off USB entirely. This is a hardware limit, not a firmware bug — see the Power section below.
 
 ## Step 1: Switch Build Target to ESP32-C3
@@ -96,8 +95,6 @@ hub instead of a laptop port directly.
 | CMOS GND | 1 | Ground reference for GPIO 2 |
 | POST LED | 8 | Addressable RGB (GBR layout, WS2812B compatible) — same pin as C6 |
 | BOOT Button | 9 | Hold at cold boot to enter Interactive Boot Menu |
-| Payload RX | 20 | Serial bootloader input (connect to adapter's TX) |
-| Payload TX | 21 | Serial bootloader output (connect to adapter's RX) |
 
 ## Testing Checklist
 
@@ -107,7 +104,7 @@ hub instead of a laptop port directly.
 - [x] Web UI reachable at `http://192.168.4.1`
 - [x] WiFi STA connects to a WPA2-PSK network
 - [x] Network boot (PXE) downloads and launches a payload from RAM
-- [ ] Serial payload bootloader (GPIO 20/21)
+- [ ] Serial payload bootloader (native USB)
 - [ ] OTA update + rollback
 
 **Tip:** if WiFi STA connection fails, double check the SSID/password you
@@ -124,8 +121,10 @@ an error condition.
 **Build fails with unknown target:** ensure ESP-IDF v6.1+ is sourced:
 `. $IDF_PATH/export.sh && idf.py --version`.
 
-**UART bootloader not responding:** double-check wiring — GPIO 20 (RX) and
-GPIO 21 (TX), not 18/19 (those are the C6 pins).
+**No console output / serial loader not responding:** the console and loader use
+native USB register access that is hard-coded for the C6 and has not been
+re-validated on C3 — see "Known limitation" in
+[ESP32-C3-SUPERMINI-PORT.md](ESP32-C3-SUPERMINI-PORT.md).
 
 **Flash size / partition mismatch:** confirm both `sdkconfig` shows
 `CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y` and the partition table in use is
